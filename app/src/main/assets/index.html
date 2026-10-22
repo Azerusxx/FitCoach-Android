@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="de"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Fit Coach</title>
+<style>
+:root{--bg:#070b16;--card:#0d1426;--tx:#e6ecff;--mu:#7f8db3;--ac:#4cc2ff;--bd:#1f3a63;--ok:#5bf0a8;--bad:#ff5d7a;color-scheme:dark;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+body{background:radial-gradient(ellipse at top,#14204a 0,#070b16 60%) fixed}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--tx);font:15px/1.45 system-ui,sans-serif;padding:12px 12px 80px;max-width:640px;margin:auto}
+h1{font-size:18px;margin:6px 0 10px;letter-spacing:3px;color:var(--ac);text-shadow:0 0 12px var(--ac);text-align:center}h2{font-size:13px;margin:0 0 8px;text-transform:uppercase;letter-spacing:2px;color:var(--ac)}h2::before{content:'[ '}h2::after{content:' ]'}
+nav{display:flex;gap:6px;margin-bottom:12px;overflow-x:auto}
+nav button{flex:1;padding:9px 6px;border:1px solid var(--bd);background:var(--card);color:var(--tx);border-radius:10px;font-size:14px}
+nav button.on{background:var(--ac);color:#fff;border-color:var(--ac)}
+.c{background:linear-gradient(160deg,#0f1a33,#0a1122);border:1px solid var(--bd);border-radius:4px;padding:12px;margin-bottom:10px;box-shadow:0 0 14px rgba(76,194,255,.15),inset 0 0 20px rgba(76,194,255,.05)}
+label{display:block;font-size:12px;color:var(--mu);margin:8px 0 2px}
+input,select,textarea{width:100%;padding:9px;border:1px solid var(--bd);border-radius:8px;background:var(--bg);color:var(--tx);font:inherit}
+textarea{min-height:130px;font-family:ui-monospace,monospace;font-size:13px}
+.r{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.b{width:100%;margin-top:10px;padding:11px;border:1px solid var(--ac);border-radius:4px;background:linear-gradient(90deg,#1b4fd8,#7c3aed);color:#fff;font-weight:700;font-size:14px;letter-spacing:1px;text-transform:uppercase;box-shadow:0 0 14px rgba(124,58,237,.6)}.bar i{background:linear-gradient(90deg,#4cc2ff,#a855f7);box-shadow:0 0 8px var(--ac)}
+.mu{color:var(--mu);font-size:13px}.ok{color:var(--ok)}.bad{color:var(--bad)}
+.bar{height:8px;background:var(--bd);border-radius:6px;overflow:hidden;margin:4px 0 8px}.bar i{display:block;height:100%;background:var(--ac)}
+.chips{display:flex;flex-wrap:wrap;gap:6px}.chip{padding:8px 12px;border:1px solid var(--bd);background:transparent;color:var(--tx);border-radius:16px;font-size:13px}.chip.on{background:var(--ac);color:#06101f;border-color:var(--ac);font-weight:700}.chip.ok{border-color:var(--ok)}.chat{display:flex;flex-direction:column;gap:6px;margin:12px 0}.bb{max-width:88%;padding:8px 11px;border-radius:12px;font-size:14px}.bb.sys{background:#14233f;align-self:flex-start}.bb.me{background:var(--ac);color:#06101f;align-self:flex-end}.inrow{display:grid;grid-template-columns:1fr 1fr auto;gap:8px;margin-top:8px}.inrow button{padding:0 18px;border:0;border-radius:8px;background:var(--ac);color:#06101f;font-weight:700;font-size:18px}.rows3{display:grid;grid-template-columns:52px 1fr 1fr;gap:6px;align-items:center;margin-top:8px}.lk{background:none;border:0;color:var(--mu);font-size:13px;text-decoration:underline;padding:6px 0}
+table{width:100%;border-collapse:collapse;font-size:13px}td,th{padding:4px 2px;text-align:left;border-bottom:1px solid var(--bd)}
+</style></head><body>
+<h1>[ SYSTEM ] FIT COACH</h1>
+<nav id="nav"></nav>
+<div id="v"></div><div id="tm"></div>
+<script>
+const K='fitcoach_v1';
+const DEF={p:{name:'',sex:'',year:'',h:'',kcal:2200,prot:150,min:8,max:12,days:'Di, Do, So',goal:''},
+T:{A:['Latzug','Schrägbankdrücken','Seitheben','Beinpresse','Bizepscurls'],B:['Rudern','Brustpresse','Beinbeuger','Trizepsdrücken','Wadenheben'],C:['Seitheben','Beinpresse','Latzug eng','Schrägbankdrücken','Bauchtraining']},
+S:[],M:[],B:[]};
+let D;try{D=JSON.parse(localStorage.getItem(K))||null}catch(e){D=null}
+D=Object.assign(JSON.parse(JSON.stringify(DEF)),D||{});
+const save=()=>{try{localStorage.setItem(K,JSON.stringify(D))}catch(e){}};
+const $=s=>document.querySelector(s);
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const today=()=>{const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`};
+const num=x=>parseFloat(String(x).replace(',','.'));
+const f1=x=>(Math.round(x*10)/10).toString().replace('.',',');
+let tab='train',draft=null,flash='';
+const tabs=[['train','Training'],['food','Ernährung'],['body','Körper'],['set','Profil']];
+function hud(){let xp=0;D.S.forEach(s=>{xp+=100+s.ex.reduce((a,e)=>a+stats(e.sets).vol,0)/50});const lv=Math.floor(Math.sqrt(xp/100))+1,cur=100*(lv-1)**2,nx=100*lv*lv;const R=lv>=26?'S':lv>=19?'A':lv>=13?'B':lv>=8?'C':lv>=4?'D':'E';return `<div class="c"><div style="display:flex;justify-content:space-between"><b>${esc(D.p.name||'Athlet')}</b><span>Rang <b style="color:var(--ac)">${R}</b> · LV ${lv}</span></div><div class="bar"><i style="width:${(xp-cur)/(nx-cur)*100}%"></i></div><div class="mu">XP ${Math.round(xp)} / ${nx} · ${D.S.length} Quests abgeschlossen</div></div>`}
+function insight(s,idx){const t=[],mx=D.p.max,ps=D.S.slice(0,idx).reverse().find(x=>x.type==s.type),pa=D.S[idx-1];
+s.ex.forEach(e=>{const n=e.sets.length;if(n>=3&&e.sets[0][0]==e.sets[n-1][0]&&e.sets[n-1][1]<e.sets[0][1]*0.7)t.push(`Bei ${e.n} bricht der letzte Satz von ${e.sets[0][1]} auf ${e.sets[n-1][1]} Wdh. ein. Prüfe die Satzpausen (2–3 min), sonst misst du eher Ermüdung als Kraft.`);
+if(n>=3&&e.sets.every(x=>x[1]==e.sets[0][1]&&x[0]==e.sets[0][0])&&e.sets[0][1]<mx)t.push(`Bei ${e.n} sind alle Sätze identisch (${e.sets[0][1]} Wdh.). Das spricht oft für Abbruch deutlich vor dem Limit. Geh im letzten Satz bewusst 1–2 Wdh. näher ran.`);
+if(e.sets[0][1]>8)t.push(`${e.n}: Mehr als 8 Wdh. im Top-Set. Prüfe Technik, RIR und die Back-off-Sätze, bevor du das Gewicht erhöhst.`);
+if(e.sets.some(x=>x[1]>mx+3))t.push(`${e.n}: Sätze mit mehr als ${mx+3} Wdh. sind meist zu leicht und liefern weniger Wachstumsreiz. Gewicht erhöhen.`)});
+if(ps){const g=Math.round((new Date(s.date)-new Date(ps.date))/864e5);if(g>10)t.push(`Zwischen den beiden ${s.type}-Einheiten liegen ${g} Tage. Schwankende Abstände verfälschen den Vergleich stärker als jede Gewichtsänderung.`)}
+if(pa&&pa.bw&&s.bw&&Math.abs(s.bw-pa.bw)>=1.5)t.push(`Dein Körpergewicht hat sich seit der letzten Einheit um ${f1(s.bw-pa.bw)} kg verändert. Das beeinflusst Leistung und Vergleichbarkeit (Wasser, Essenszeit).`);
+const tot=s.ex.reduce((a,e)=>a+stats(e.sets).vol,0);const big=s.ex.find(e=>tot&&stats(e.sets).vol/tot>0.45&&s.ex.length>2);if(big)t.push(`${big.n} macht über 45 % des Volumens aus. Maschinen-Kilogramm allein sagen wenig über die Belastung der Zielmuskeln. Beurteile Muskelgefühl und Bewegungsumfang mit.`);
+const fb=['Eine kontrollierte Negativphase (2–3 s) und volle Dehnung bringen oft mehr als 2,5 kg extra. Notiere zusätzlich, wie viele Wdh. du noch in Reserve hattest (RIR).','Verteile dein Protein auf 3–4 Mahlzeiten mit je etwa 30–40 g. Das wirkt meist besser als ein großer Anteil am Abend.','Gleiche Uhrzeit und ähnlicher Ernährungszustand vor dem Training machen Leistungen vergleichbarer als jede App-Statistik.','Schlaf unter 7 Stunden senkt Leistung und Regeneration spürbar, auch wenn du dich motiviert fühlst. Notiere ihn für ein paar Wochen mit.'];
+return '<span style="color:var(--ac)">Versteckter Hinweis des Systems</span><br>'+(t.length?t[idx%t.length]:fb[idx%fb.length])}
+function nav(){$('#nav').innerHTML=tabs.map(([k,l])=>`<button class="${k==tab?'on':''}" onclick="tab='${k}';draft=null;render()">${l}</button>`).join('')}
+const e1=(w,r)=>w*(1+r/30);
+function nextType(){const l=D.S[D.S.length-1];return l?{A:'B',B:'C',C:'A'}[l.type]:'A'}
+function hist(n){const o=[];D.S.forEach(s=>{const x=s.ex.find(e=>e.n.toLowerCase()==n.toLowerCase());if(x)o.push({d:s.date,sets:x.sets})});return o}
+function stats(sets){const vol=sets.reduce((a,s)=>a+s[0]*s[1],0),reps=sets.reduce((a,s)=>a+s[1],0),tw=Math.max(...sets.map(s=>s[0])),top=sets.filter(s=>s[0]==tw),best=Math.max(...sets.map(s=>e1(s[0],s[1])));return{vol,reps,tw,top,best}}
+const stepOf=w=>w>=20?2.5:w>=10?1:0.5,rnd=w=>Math.round(w/stepOf(w))*stepOf(w);
+function rec(n){const h=hist(n);if(!h.length)return{w:null,t:'6–8',b:null,bt:'10–12',why:'Noch keine Vergleichswerte. Beginne mit einem sauberen Top-Set (6–8 Wdh., etwa 1–2 RIR).'};
+const last=h[h.length-1].sets,topW=Math.max(...last.map(x=>x[0])),top=last.filter(x=>x[0]===topW),topReps=Math.max(...top.map(x=>x[1]));
+const previous=h.slice(-3,-1),consistent=previous.length>0&&previous.every(v=>v.sets.some(x=>x[0]===topW&&x[1]>=8));
+const back=last.filter(x=>x[0]<topW),backGood=back.length>=2&&back.every(x=>x[1]>=10);
+const drop=last.length>1&&last[last.length-1][0]===topW&&last[last.length-1][1]<topReps*.75;
+const ready=topReps>=8&&backGood&&consistent&&!drop;
+const step=stepOf(topW),w=ready?topW+step:topW,b=rnd(w*.85),bw=Math.min(b,w-step);
+let why=ready?'8 Wdh. im Top-Set, mindestens zwei solide Back-off-Sätze und wiederholt bestätigt: kleine Steigerung sinnvoll.':topReps>=8?'8 Wdh. im Top-Set allein reichen nicht. Erst Back-off-Leistung und Wiederholbarkeit bestätigen, Gewicht halten.':'Top-Set noch unter 8 Wdh.: Gewicht halten und kontrolliert Wiederholungen steigern.';
+if(drop)why+=' Deutlicher Einbruch im letzten Satz: Pausen und Erholung prüfen.';
+return{w,t:ready?'6–8':`${Math.min(8,Math.max(6,topReps+1))}–8`,r:ready?6:Math.min(8,Math.max(6,topReps+1)),b:bw,br:10,bt:'10–12',alt:ready?topW:null,why};}
+function recTxt(n){const r=rec(n);if(!r.w)return `<b>Satz 1 (Top-Set):</b> Gewicht so wählen, dass maximal 8 saubere Wdh. möglich sind.<br><b>Satz 2–3 (Back-off):</b> ca. 15 % leichter, 10–12 Wdh.<br><span class="mu">${r.why}</span>`;return `<b>Satz 1 (Top-Set):</b> ${f1(r.w)} kg × ${r.t} Wdh. (max. 8)<br><b>Satz 2–3 (Back-off):</b> ${f1(r.b)} kg × ${r.bt} Wdh.${r.alt?`<br><span class="mu">Alternativ Top-Set bei ${f1(r.alt)} kg halten</span>`:''}<br><span class="mu">${r.why}</span>`}
+function nextPlan(type){return `<div class="c"><h2>Nächste Quest: ${type}</h2>`+D.T[type].map(n=>`<div style="margin:8px 0"><b>${esc(n)}</b><br>${recTxt(n)}</div>`).join('')+'<div class="mu">Übungsreihenfolge konstant halten, Bewegungsumfang vor Gewicht.</div></div>'}
+function curW(){const bs=D.B.filter(x=>Number.isFinite(x.bw)).slice().sort((a,b)=>a.d.localeCompare(b.d));if(bs.length)return bs[bs.length-1].bw;const s=[...D.S].reverse().find(x=>x.bw);return s?s.bw:null}
+function avgSteps(){const l=D.B.filter(x=>x.st).slice(-7);return l.length?l.reduce((a,x)=>a+x.st,0)/l.length:(D.p.steps||null)}
+function energy(){const p=D.p,w=curW(),h=num(p.h),age=new Date().getFullYear()-num(p.year),st=avgSteps();
+if(!w||!h||!age||!p.sex)return `<div class="c"><h2>Energiebedarf</h2><div class="mu">Für die Berechnung fehlen: ${[!w&&'Gewicht (Tab Körper)',!h&&'Größe',!p.year&&'Geburtsjahr',!p.sex&&'Geschlecht'].filter(Boolean).join(', ')} (Profil).</div></div>`;
+const off=p.sex=='männlich'?5:p.sex=='weiblich'?-161:-78,bmr=10*w+6.25*h-5*age+off,base=bmr*1.15,sk=(st||0)*w*0.00035,nT=(p.days||'').split(/[,;]/).filter(s=>s.trim()).length||3,tk=nT*250/7,tdee=base+sk+tk;
+const mode=p.mode||'cut',kc=Math.round(tdee*{cut:.85,hold:1,bulk:1.1}[mode]/10)*10,pr=protT(),fat=Math.round(w*0.8),ch=Math.max(0,Math.round((kc-pr*4-fat*9)/4)),fw=p.sex=='weiblich';
+const sg={cut:'8.000–10.000',hold:'7.000–9.000',bulk:'6.000–8.000'}[mode],R=(a,b)=>`<tr><td>${a}</td><td>${b}</td></tr>`;
+const mic=[['Ballaststoffe',Math.round(kc/1000*14)+' g'],['Wasser',(w*0.035+0.5).toFixed(1).replace('.',',')+' L (Trainingstag)'],['Eisen',fw?'15 mg':'10 mg'],['Magnesium',fw?'300 mg':'350 mg'],['Calcium','1.000 mg'],['Zink',fw?'8 mg':'11 mg'],['Kalium','4.000 mg'],['Vitamin C',fw?'95 mg':'110 mg'],['Vitamin D','20 µg'],['Jod','200 µg'],['Omega-3 (EPA+DHA)','ca. 250–500 mg']];
+return `<div class="c"><h2>Energiebedarf</h2><table>${R('Grundumsatz (Mifflin-St Jeor)','<b>'+Math.round(bmr)+' kcal</b>')}${R('Alltag und Verdauung (+15 %)','+'+Math.round(base-bmr))}${R('Schritte (Ø '+(st?Math.round(st).toLocaleString('de-DE'):'?')+')','+'+Math.round(sk))}${R('Krafttraining ('+nT+'×/Woche, ca. 250 kcal)','+'+Math.round(tk))}${R('Gesamtumsatz','<b>'+Math.round(tdee)+' kcal</b>')}</table>
+<div class="mu" style="margin-top:6px">Empfohlene Schritte: ${sg} pro Tag. Schrittkalorien sind nur eine grobe Näherung; Tempo, Strecke und bereits erfasste Alltagsaktivität beeinflussen den tatsächlichen Mehrverbrauch.</div></div>
+<div class="c"><h2>Tagesziel (${{cut:'Fettabbau, ca. −15 %',hold:'Halten',bulk:'Aufbau, ca. +10 %'}[mode]})</h2><table>${R('Kalorien','<b>'+kc+' kcal</b>')}${R('Protein',pr+' g ('+f1(pr/w)+' g/kg)')}${R('Fett',fat+' g (0,8 g/kg)')}${R('Kohlenhydrate',ch+' g')}</table><button class="b" onclick="D.p.kcal=${kc};D.p.prot=${pr};save();render()">Als Tagesziel übernehmen</button>
+<h2 style="margin-top:14px">Mikronährstoffe (Richtwerte)</h2><table>${micRef().map(m=>R(m[1],String(m[3]).replace('.',',')+' '+m[2])).join('')}</table><div class="mu" style="margin-top:6px">Alle Werte sind Schätzungen; der tatsächliche Verbrauch kann deutlich stärker abweichen. Die Mikro-Richtwerte orientieren sich grob an DGE-Referenzwerten und berücksichtigen Geschlecht, Alter, Gewicht (Wasser) und Kalorien (Ballaststoffe), nicht die Größe. Kein Ersatz für ärztliche Beratung.</div></div>`}
+function recOld(n){const h=hist(n);if(!h.length)return{w:null,t:D.p.min,why:'Keine Vorwerte: Startgewicht so wählen, dass '+D.p.min+'–'+D.p.max+' Wdh. sauber möglich sind.'};
+const L=stats(h[h.length-1].sets),mn=D.p.min,mx=D.p.max;const topR=L.top.map(s=>s[1]);
+if(L.top.length>=3&&Math.min(...topR)>=mx){const inc=L.tw>=40?2.5:1.25;return{w:L.tw+inc,t:mn,alt:L.tw,why:`Alle Arbeitssätze bei ${f1(L.tw)} kg: ${mx} Wdh. erreicht, daher Gewicht erhöhen. Technik und Bewegungsumfang zuerst prüfen.`}}
+if(Math.min(...topR)<mn)return{w:L.tw,t:mn,why:`Unter ${mn} Wdh. bei ${f1(L.tw)} kg: Last und Technik prüfen, Gewicht halten, nicht erhöhen.`};
+return{w:L.tw,t:Math.min(mx,Math.min(...topR)+1),why:`Gewicht halten und Wdh. verbessern (letztes Mal ${topR.join('/')}).`}}
+function planText(type){return D.T[type].map(n=>{const r=rec(n);return n+': '+(r.w?Array(3).fill(f1(r.w)+'x'+r.t).join(' '):'')}).join('\n')}
+function parse(txt){const ex=[];txt.split('\n').forEach(l=>{const i=l.indexOf(':');if(i<1)return;const n=l.slice(0,i).trim();const sets=[...l.slice(i+1).matchAll(/(\d+(?:[.,]\d+)?)\s*[x×]\s*(\d+)/gi)].map(m=>[num(m[1]),parseInt(m[2])]);if(sets.length)ex.push({n,sets})});return ex}
+function analyse(s,idx){let out='',tot=0,nsets=0,notes=[];
+const prev=[...D.S].slice(0,idx).reverse().find(x=>x.type==s.type);
+s.ex.forEach(e=>{const st=stats(e.sets);tot+=st.vol;nsets+=e.sets.length;
+const before=D.S.slice(0,idx).map(x=>x.ex.find(y=>y.n.toLowerCase()==e.n.toLowerCase())).filter(Boolean);
+let cmp='<span class="mu">Erste Erfassung</span>',pr='';
+if(before.length){const pb=stats(before[before.length-1].sets),d=(st.best/pb.best-1)*100;
+cmp=d>2?`<span class="ok">Steigerung (e1RM ${d.toFixed(1)} %)</span>`:d<-2?`<span class="bad">Rückgang (e1RM ${d.toFixed(1)} %)</span>`:'Stagnation / im Messrauschen';
+cmp+=`, Volumen ${st.vol>=pb.vol?'+':''}${Math.round(st.vol-pb.vol)} kg`;
+const allbest=Math.max(...before.map(b=>stats(b.sets).best));if(st.best>allbest*1.005)pr=' 🏆 neuer Bestwert (e1RM)';
+let ns=0;for(let i=before.length-1;i>=0;i--){const bb=stats(before[i].sets).best;const prior=Math.max(0,...before.slice(0,i).map(b=>stats(b.sets).best));if(bb<=prior*1.005)ns++;else break}
+if(st.best<=allbest*1.005&&ns>=2)notes.push(`${e.n}: seit ${ns+1} Einheiten kein Fortschritt, mögliche Anpassung prüfen.`)}
+const ws=[...new Set(e.sets.map(x=>x[0]))];
+const tb=ws.length>1?`<div class="mu">Top-Set: ${f1(st.tw)}×${e.sets.find(x=>x[0]==st.tw)[1]}; Back-off getrennt bewerten.</div>`:'';
+out+=`<div style="margin:8px 0"><b>${esc(e.n)}</b>${pr}<br>${e.sets.map(x=>f1(x[0])+'×'+x[1]).join(', ')} · ${st.reps} Wdh. · ${Math.round(st.vol)} kg<br>${cmp}${tb}</div>`});
+let pv='';if(prev){const pt=prev.ex.reduce((a,e)=>a+stats(e.sets).vol,0);pv=`Vorherige Einheit ${prev.type}: ${Math.round(pt)} kg (${tot>=pt?'+':''}${Math.round(tot-pt)}). Mehr Volumen ist nicht automatisch mehr Muskelaufbau.`}
+const weak=D.S.slice(Math.max(0,idx-2),idx+1).length==3&&notes.length>=2;
+return `<div class="c"><h2>Übersicht</h2>${s.date} · Typ ${s.type} · Körpergewicht ${s.bw?f1(s.bw)+' kg':'unbekannt'}<br>${nsets} Sätze · Gesamtvolumen ${Math.round(tot)} kg<br><span class="mu">${pv}</span></div>
+<div class="c"><h2>Übungsanalyse</h2>${out}</div>
+${recov(s,idx)}<div class="c"><h2>Übersehen</h2>${insight(s,idx)}</div>
+<div class="c"><h2>Auffälligkeiten</h2>${notes.length?notes.map(n=>'• '+esc(n)).join('<br>'):'Keine Plateaus erkannt.'}${weak?'<br>• Mehrere stagnierende Übungen: Schlaf, Stress, Ernährung prüfen. Ein Deload erst nach mehreren schwachen Einheiten.':''}</div>`}
+function nextPlanOld(type){return `<div class="c"><h2>Nächste Quest: ${type}</h2>`+D.T[type].map(n=>{const r=rec(n);return `<div style="margin:8px 0"><b>${esc(n)}</b>: ${r.w?`${f1(r.w)} kg × ${r.t} Wdh. (3 Sätze)${r.alt?`<br><span class="mu">Alternativ: ${f1(r.alt)} kg halten</span>`:''}`:'Gewicht wählen'}<br><span class="mu">${r.why}</span></div>`}).join('')+'<div class="mu">Übungsreihenfolge konstant halten, Bewegungsumfang vor Gewicht.</div></div>'}
+function newDraft(t){return{type:t,ex:[],cur:null,date:today(),bw:''}}
+function exList(){const d=draft;return D.T[d.type].concat(d.ex.map(e=>e.n).filter(n=>!D.T[d.type].includes(n)))}
+function recTxtOld(n){const r=rec(n);return (r.w?`Ziel: ${f1(r.w)} kg × ${r.t}+ Wdh.`+(r.alt?` (alternativ ${f1(r.alt)} kg halten)`:''):'Startgewicht wählen')+`<br><span class="mu">${r.why}</span>`}
+function pick(i){draft.cur=exList()[i];render();setTimeout(()=>{const x=$('#iw');if(x)x.focus()})}
+function customEx(){const n=(prompt('Name der Übung')||'').trim();if(n){draft.cur=n;if(!exList().includes(n))draft.ex.push({n,sets:[]});render()}}
+function addSet(){const w=num($('#iw').value),r=parseInt($('#ir').value);if(isNaN(w)||isNaN(r)||r<1){return}
+let e=draft.ex.find(x=>x.n==draft.cur);if(!e){e={n:draft.cur,sets:[]};draft.ex.push(e)}e.sets.push([w,r]);render();setTimeout(()=>{const x=$('#ir');if(x)x.focus()})}
+function addPlan(){const R=rec(draft.cur);if(!R.w)return;let e=draft.ex.find(x=>x.n==draft.cur);if(!e){e={n:draft.cur,sets:[]};draft.ex.push(e)}if(e.sets.length)return;e.sets.push([R.w,R.r],[R.b,R.br],[R.b,R.br]);render()}
+function multiRows(ce,R,n0){let o=`<div class="rows3" id="rows" data-n0="${n0}">`;for(let i=0;i<3;i++){const s=n0+i,w=R.w?(s==0?R.w:R.b):'',r=R.w?(s==0?parseInt(R.t.split('–').pop()):10):'';o+=`<span class="mu">Satz ${s+1}${s==0?'<br>Top':''}</span><input id="w${i}" inputmode="decimal" placeholder="kg" value="${w}"><input id="r${i}" inputmode="numeric" placeholder="${s==0?'max. 8':'10–12'}" value="${r}">`}
+return o+`</div><button class="b" onclick="addSets()">Sätze speichern</button><button class="lk" onclick="moreRow()">+ Satz</button>`+(ce&&ce.sets.length?`<button class="lk" onclick="undoSet()">Letzten Satz löschen</button>`:'')}
+function moreRow(){const c=$('#rows'),i=c.querySelectorAll('input[id^=w]').length,n=(+c.dataset.n0)+i+1,pw=$('#w'+(i-1)).value;c.insertAdjacentHTML('beforeend',`<span class="mu">Satz ${n}</span><input id="w${i}" inputmode="decimal" placeholder="kg" value="${pw}"><input id="r${i}" inputmode="numeric" placeholder="Wdh.">`)}
+function addSets(){const c=$('#rows'),cnt=c.querySelectorAll('input[id^=w]').length,add=[];for(let i=0;i<cnt;i++){const w=num($('#w'+i).value),r=parseInt($('#r'+i).value);if(!isNaN(w)&&r>0)add.push([w,r])}if(!add.length)return;let e=draft.ex.find(x=>x.n==draft.cur);if(!e){e={n:draft.cur,sets:[]};draft.ex.push(e)}add.forEach(s=>e.sets.push(s));render();startT(90)}
+function rs(k,l){return `<div><label>${l}</label><select onchange="draft.${k}=this.value">${['','1','2','3','4','5'].map(x=>`<option ${x==(draft[k]||'')?'selected':''}>${x}</option>`).join('')}</select></div>`}
+let tt=null,tl=0;
+function showTOld(){const e=$('#tm');if(tab!='train'){e.innerHTML='';return}const m=Math.floor(tl/60),s=String(tl%60).padStart(2,'0');e.innerHTML=`<div style="position:fixed;left:0;right:0;bottom:0;padding:8px 12px calc(8px + env(safe-area-inset-bottom,0px));background:#0a1122;border-top:1px solid var(--bd);display:flex;gap:6px;align-items:center;justify-content:center;z-index:5"><b style="color:var(--ac);min-width:84px">Pause ${m}:${s}</b>${[60,90,120,180].map(x=>`<button class="chip" onclick="startT(${x})">${x}s</button>`).join('')}<button class="chip" onclick="stopT()">✕</button></div>`}
+let tt0=60;
+function showT(){const e=$('#tm');if(tab!='train'){e.innerHTML='';return}const m=Math.floor(tl/60),s=String(tl%60).padStart(2,'0');const bar=`<div style="position:fixed;left:0;right:0;bottom:0;padding:8px 12px calc(8px + env(safe-area-inset-bottom,0px));background:#0a1122;border-top:1px solid var(--bd);display:flex;gap:6px;align-items:center;justify-content:center;z-index:5"><b style="color:var(--ac)">Pause</b>${[60,90,120,180].map(x=>`<button class="chip" onclick="startT(${x})">${x}s</button>`).join('')}</div>`;if(tl<=0){e.innerHTML=bar;return}
+const R=88,C=2*Math.PI*R,off=C*(1-tl/tt0);e.innerHTML=bar+`<div style="position:fixed;inset:0;z-index:50;background:rgba(3,6,14,.92);display:flex;align-items:center;justify-content:center;padding:20px"><div style="width:100%;max-width:360px;text-align:center;padding:22px 16px;border:1px solid var(--ac);background:linear-gradient(160deg,#0f1a33,#0a1122);box-shadow:0 0 40px rgba(76,194,255,.35),inset 0 0 30px rgba(124,58,237,.2)"><div style="color:var(--ac);letter-spacing:4px;font-size:13px">[ SYSTEM ]</div><div style="margin:6px 0 10px;font-size:14px;color:var(--mu);letter-spacing:2px">QUEST-PAUSE</div><div style="position:relative;width:210px;height:210px;margin:auto"><svg viewBox="0 0 200 200" width="210" height="210" style="transform:rotate(-90deg)"><circle cx="100" cy="100" r="${R}" fill="none" stroke="var(--bd)" stroke-width="8"/><circle cx="100" cy="100" r="${R}" fill="none" stroke="var(--ac)" stroke-width="8" stroke-linecap="round" stroke-dasharray="${C}" stroke-dashoffset="${off}" style="filter:drop-shadow(0 0 8px var(--ac))"/></svg><div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:52px;font-weight:800;color:var(--tx);text-shadow:0 0 18px var(--ac)">${m}:${s}</div></div><div style="margin:12px 0;color:var(--mu);font-size:13px">Erholung läuft. Atme, trink etwas, bereite den nächsten Satz vor.</div><div style="display:flex;gap:8px"><button class="b" style="margin:0" onclick="startT(tl+30)">+30 s</button><button class="b" style="margin:0;background:#1f2a44" onclick="stopT()">Überspringen</button></div></div></div>`}
+function startT(x){clearInterval(tt);tl=x;tt0=x;showT();tt=setInterval(()=>{tl--;if(tl<=0){stopT();beep();return}showT()},1000)}
+function stopT(){clearInterval(tt);tl=0;showT()}
+function beep(){try{navigator.vibrate&&navigator.vibrate([200,100,200]);const a=new AudioContext(),o=a.createOscillator();o.connect(a.destination);o.frequency.value=880;o.start();setTimeout(()=>{o.stop();a.close()},400)}catch(e){}}
+function weakQ(i){const s=D.S[i];let n=0,d=0;s.ex.forEach(e=>{const b=D.S.slice(0,i).map(x=>x.ex.find(y=>y.n.toLowerCase()==e.n.toLowerCase())).filter(Boolean);if(!b.length)return;n++;if(stats(e.sets).best<stats(b[b.length-1].sets).best*0.98)d++});return n>0&&d/n>=0.5}
+function recov(s,idx){const t=[],dr=(D.R||[]).find(x=>x.d==s.date)||{},r=Object.assign({},s.rd,{sl:dr.sl,st:dr.st,so:dr.so}),wk=[idx-2,idx-1,idx].filter(i=>i>=0&&weakQ(i)).length;if(r){if(r.sl&&r.sl<6.5)t.push(`Schlaf ${f1(r.sl)} h: unter 6,5 h leiden Leistung und Erholung messbar.`);if(r.st>=4)t.push('Hoher Stress: Er bremst Regeneration. Gewichte halten statt steigern, wenn die Leistung fällt.');if(r.so>=4)t.push('Starker Muskelkater: Satzzahl der betroffenen Muskelgruppe reduzieren oder Gewicht halten.');if(r.ri!=null&&r.ri>=4)t.push('4 oder mehr Wiederholungen in Reserve im letzten Satz: Das Gewicht kann höher.');if(r.ri===0)t.push('Letzter Satz bis zum Muskelversagen: Das ist ok, aber nicht in jeder Übung sinnvoll (Ermüdung, Technik).')}
+if(wk>=3)t.push('Drei schwächere Einheiten in Folge: Regeneration prüfen und einen geplanten Deload erwägen (ca. halbe Satzzahl, Gewichte halten).');else if(wk==2)t.push('Zwei schwächere Einheiten: Schlaf, Stress und Ernährung prüfen, noch kein Deload.');return t.length?`<div class="c"><h2>Regeneration</h2>${t.map(x=>'• '+x).join('<br>')}</div>`:''}
+function mg(n){n=n.toLowerCase();return /beinbeug|rumän|hinter/.test(n)?'Hintere Oberschenkel':/wad/.test(n)?'Waden':/bauch|crunch|plank/.test(n)?'Bauch':/bizeps|curl/.test(n)?'Bizeps':/trizeps|pushdown|dips/.test(n)?'Trizeps':/seitheb|schulter|lateral|face|reverse/.test(n)?'Schultern':/lat|zug|klimm|rudern|pull/.test(n)?'Rücken/Lat':/brust|bank|fly|schräg/.test(n)?'Brust':/bein|squat|kniebeuge|presse|ausfall|quad/.test(n)?'Beine (vorn)':'Sonstige'}
+function volCard(){if(!D.S.length)return '';const c7=new Date(Date.now()-6*864e5).toISOString().slice(0,10),c28=new Date(Date.now()-27*864e5).toISOString().slice(0,10),wk=Math.max(1,Math.min(4,(Date.now()-new Date(D.S[0].date))/6048e5)),a={},b={};D.S.forEach(s=>s.ex.forEach(e=>{const g=mg(e.n),n=e.sets.length;if(s.date>=c7)a[g]=(a[g]||0)+n;if(s.date>=c28)b[g]=(b[g]||0)+n}));const gs=Object.keys(b).sort((x,y)=>b[y]-b[x]);if(!gs.length)return '';return `<div class="c"><h2>Sätze pro Muskelgruppe</h2><table><tr><th>Gruppe</th><th>7 Tage</th><th>Ø/Woche</th></tr>${gs.map(g=>{const av=b[g]/wk;return `<tr><td>${g}</td><td>${a[g]||0}</td><td class="${av<10||av>20?'bad':'ok'}">${f1(av)}</td></tr>`}).join('')}</table><div class="mu">Richtwert: ca. 10–20 harte Sätze pro Muskelgruppe und Woche. Für deine Ziele sind Schultern, Rücken/Lat und Brust am wichtigsten. Zuordnung grob nach Übungsnamen.</div></div>`}
+function coachCard(){if(!D.S.length)return '';return `<div class="c"><h2>Coach-Analyse</h2><div class="mu">Langfristige Entwicklung und Reality Check, von Claude aus deinen Daten geschrieben.</div><button class="b" onclick="coach()">Analyse erstellen</button><div id="co" style="white-space:pre-wrap;margin-top:8px;font-size:14px"></div></div>`}
+async function aiRequest(payload){const r=await fetch('/api/ai',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});const j=await r.json().catch(()=>({}));if(!r.ok)throw Error(j.error||'KI-Dienst nicht erreichbar');return j.result;}
+async function coach(){const o=$('#co');o.textContent='Analysiere …';try{const data={profil:D.p,quests:D.S.slice(-20),koerper:D.B.slice(-20),tage:(D.R||[]).slice(-14)};o.textContent=await aiRequest({task:'coach',data});}catch(e){o.textContent=e.message+' – Für ChatGPT muss der mitgelieferte lokale Server laufen.'}}
+const SEED=`20.10.2026 B
+Trizeps Pushdown: 65x11, 60x13, 60x14
+Wadenheben sitzend: 95x9, 90x12, 90x12
+Rudern eng: 75x10, 70x12, 70x12
+Bankdrückmaschine: 75x11, 70x12, 70x10
+Beinbeuger: 90x11, 85x12, 85x12
+
+16.10.2026 C 76,5
+Seitheben Maschine: 65x12, 60x11, 60x9
+Beinpresse: 213x13, 213x11, 213x9
+Latzug breit: 90x12, 90x11, 90x11
+Bauchmaschine: 100x14, 100x10, 100x10
+Schrägbankmaschine: 80x10, 75x12, 75x11
+
+11.10.2026 A 78
+Latzug breit: 85x10, 85x11, 85x9
+Schrägbankmaschine: 75x12, 75x12, 75x10
+Seitheben Maschine: 55x12, 55x12, 55x11
+Beinpresse: 205x10, 205x12, 205x10
+Bauchmaschine: 95x12, 95x11, 95x11
+
+04.10.2026 A
+Latzug breit: 85x12, 85x12, 85x12
+Schrägbankmaschine: 70x12, 70x12, 70x11
+Seitheben Maschine: 55x12, 55x12, 55x12
+Beinpresse: 205x12, 205x12, 205x12
+Bauchmaschine: 95x12, 95x12, 95x12
+Bizeps Curl Maschine: 50x12, 50x12, 50x12
+
+02.10.2026 C 78
+Seitheben Maschine: 55x12, 55x12, 55x12
+Beinpresse: 205x12, 205x12, 205x12
+Latzug breit: 85x11, 85x13, 85x12
+Bauchmaschine: 95x12, 95x12, 95x12
+Schrägbankmaschine: 70x12, 70x12, 70x12
+
+30.09.2026 B
+Beinbeuger: 85x12, 85x12, 85x12
+Rudern eng: 70x12, 70x12, 70x12
+Bankdrückmaschine: 70x12, 70x12, 70x12
+Trizeps Pushdown: 60x12, 60x12, 60x12
+Wadenheben sitzend: 90x12, 90x12, 90x12
+
+27.09.2026 A
+Latzug breit: 85x8, 85x9, 85x9
+Schrägbankmaschine: 70x12, 70x12, 70x12
+Seitheben Maschine: 55x12, 55x12, 55x12
+Beinpresse: 205x12, 205x12, 205x12
+Bauchmaschine: 95x12, 95x12, 95x12
+Bizeps Curl Maschine: 50x12, 50x12, 50x12
+
+22.09.2026 B 78
+Beinbeuger: 85x12, 85x11, 85x10
+Rudern eng: 65x12, 65x10, 65x11
+Bankdrückmaschine: 70x9, 70x9, 70x8
+Trizeps Pushdown: 60x11, 60x12, 60x10
+Wadenheben sitzend: 90x12, 90x10, 90x11
+
+20.09.2026 A
+Latzug breit: 85x9, 80x10, 80x9
+Schrägbankmaschine: 70x12, 70x12, 70x12
+Seitheben Maschine: 55x12, 55x11, 55x11
+Beinpresse: 205x12, 205x12, 205x12
+Bauchmaschine: 95x12, 95x12, 95x12
+
+15.09.2026 B 78
+Beinbeuger: 85x12, 85x12, 85x12
+Rudern eng: 65x12, 65x12
+Bankdrücken frei: 60x10, 60x7, 60x6
+Trizeps Pushdown: 60x12, 60x12, 60x11
+Wadenheben stehend: 90x12, 110x12, 110x12
+
+10.09.2026 C 78,5
+Seitheben Maschine: 55x11, 55x9, 55x8
+Beinpresse: 205x12, 205x12, 205x12
+Latzug breit: 85x9, 85x9, 85x8
+Bauchmaschine: 95x12, 95x10, 95x11
+Schrägbankmaschine: 65x13, 65x12, 65x12
+
+08.09.2026 B 78
+Beinbeuger: 85x10, 85x9, 85x10
+Rudern eng: 70x10, 70x10, 70x8
+Bankdrückmaschine: 75x11, 75x10, 75x10
+Trizeps Pushdown: 60x11, 60x10, 60x11
+Wadenheben sitzend: 95x7, 90x10, 90x10
+
+06.09.2026 A 77
+Latzug breit: 80x12, 80x12, 80x11
+Schrägbankmaschine: 60x13, 60x12, 60x10
+Seitheben Maschine: 50x12, 50x11, 50x10
+Beinpresse: 197x12, 197x12, 197x11
+Bauchmaschine: 90x12, 90x12, 90x12
+Bizeps Curl Maschine: 45x12, 45x12, 45x12
+
+04.09.2026 C 77
+Seitheben Maschine: 50x12, 50x12, 50x12
+Beinpresse: 197x12, 197x12, 197x12
+Latzug breit: 80x12, 80x12, 80x12
+Bauchmaschine: 90x12, 90x12, 90x11
+Schrägbankmaschine: 60x12, 60x11, 60x7
+
+01.09.2026 B 77,8
+Beinbeuger: 85x10, 85x10, 85x9
+Rudern eng: 65x10, 65x11, 65x9
+Bankdrückmaschine: 70x10, 70x6, 65x9
+Trizeps Pushdown: 60x10, 60x10, 60x9
+Wadenheben stehend: 90x12, 90x10, 90x9`;
+function seed(){let n=0;SEED.trim().split(/\n\s*\n/).forEach(b=>{const ls=b.trim().split('\n'),m=ls[0].match(/(\d\d)\.(\d\d)\.(\d{4})\s+([ABC])\s*([\d,]+)?/);if(!m)return;const d=m[3]+'-'+m[2]+'-'+m[1];if(D.S.some(x=>x.date==d))return;const ex=parse(ls.slice(1).join('\n'));D.S.push({date:d,type:m[4],bw:m[5]?num(m[5]):null,ex});if(m[5]&&!D.B.some(x=>x.d==d))D.B.push({d,bw:num(m[5]),w:null,st:null});n++});
+if(!D.B.some(x=>x.d=='2026-10-06'))D.B.push({d:'2026-10-06',bw:78.2,w:null,st:null});
+const cmp=(a,b)=>a<b?-1:a>b?1:0;D.S.sort((a,b)=>cmp(a.date,b.date));D.B.sort((a,b)=>cmp(a.d,b.d));const p=D.p;if(!p.sex)p.sex='männlich';if(!p.year)p.year='1987';if(!p.h)p.h='168';
+D.T={A:['Latzug breit','Schrägbankmaschine','Seitheben Maschine','Beinpresse','Bauchmaschine','Bizeps Curl Maschine'],B:['Beinbeuger','Rudern eng','Bankdrückmaschine','Trizeps Pushdown','Wadenheben sitzend'],C:['Seitheben Maschine','Beinpresse','Latzug breit','Bauchmaschine','Schrägbankmaschine']};draft=null;save();alert(n+' Quests geladen');render()}
+function dayCard(){D.R=D.R||[];const t=today(),c=D.R.find(x=>x.d==t)||{},sel=(id,v)=>`<select id="${id}">${['','1','2','3','4','5'].map(x=>`<option ${x==(v||'')?'selected':''}>${x}</option>`).join('')}</select>`;return `<div class="c"><h2>Tagescheck</h2><div class="mu">Pro Tag, auch ohne Training.</div><div class="r"><div><label>Datum</label><input type="date" id="rd_d" value="${t}"></div><div><label>Schlaf (h)</label><input id="rd_s" inputmode="decimal" value="${c.sl||''}"></div><div><label>Stress (1–5)</label>${sel('rd_t',c.st)}</div><div><label>Muskelkater (1–5)</label>${sel('rd_m',c.so)}</div></div><button class="b" onclick="addR()">Tag speichern</button>${D.R.length?`<div class="mu" style="margin-top:6px">Zuletzt: ${D.R.slice(-3).reverse().map(x=>`${x.d}: ${x.sl||'–'} h, S${x.st||'–'}, MK${x.so||'–'}`).join(' · ')}</div>`:''}</div>`}
+function addR(){const d=$('#rd_d').value||today(),o={d,sl:num($('#rd_s').value)||null,st:+$('#rd_t').value||null,so:+$('#rd_m').value||null};D.R=(D.R||[]).filter(x=>x.d!=d);D.R.push(o);D.R.sort((a,b)=>a.d<b.d?-1:1);save();render()}
+function confirmAll(){const R=rec(draft.cur);if(!R.w)return;const tr=parseInt(R.t.split('–').pop());let e=draft.ex.find(x=>x.n==draft.cur);if(!e){e={n:draft.cur,sets:[]};draft.ex.push(e)}e.sets.push([R.w,tr],[R.b,10],[R.b,10]);render()}
+function undoSet(){const e=draft.ex.find(x=>x.n==draft.cur);if(!e)return;e.sets.pop();if(!e.sets.length)draft.ex=draft.ex.filter(x=>x!==e);render()}
+function finish(){const ex=draft.ex.filter(e=>e.sets.length);if(!ex.length)return;D.S.push({date:draft.date||today(),type:draft.type,bw:num(draft.bw)||null,ex,rd:{sl:num(draft.sl)||null,st:+draft.stz||null,so:+draft.so||null,ri:draft.ri?num(draft.ri):null}});D.S.sort((a,b)=>a.date<b.date?-1:0);const g=100+ex.reduce((a,e)=>a+stats(e.sets).vol,0)/50;flash='[ Quest abgeschlossen ] +'+Math.round(g)+' XP';save();draft=null;render();scrollTo(0,0)}
+function train(){const fl=flash;flash='';const nt=nextType();if(!draft||!draft.ex)draft=newDraft(nt);const d=draft,L=exList();if(!d.cur&&L.length)d.cur=L[0];
+let h=(fl?`<div class="c" style="text-align:center;color:var(--ac);font-weight:700">${fl}</div>`:'')+`<div class="c"><h2>Quest erfassen</h2><div class="r"><div><label>Datum</label><input type="date" value="${d.date}" onchange="draft.date=this.value"></div><div><label>Körpergewicht (kg)</label><input inputmode="decimal" value="${esc(d.bw)}" onchange="draft.bw=this.value"></div></div>
+<div class="r"><div><label>RIR im letzten Satz</label><input inputmode="numeric" value="${esc(d.ri||'')}" onchange="draft.ri=this.value"></div><label>Quest-Typ (Vorschlag nach Zyklus: ${nt})</label><select onchange="draft=newDraft(this.value);render()">${['A','B','C'].map(t=>`<option ${t==d.type?'selected':''}>${t}</option>`).join('')}</select>
+<label>Übung antippen</label><div class="chips">${L.map((n,i)=>{const e=d.ex.find(x=>x.n==n);return `<button class="chip ${d.cur==n?'on':''} ${e&&e.sets.length?'ok':''}" onclick="pick(${i})">${e&&e.sets.length?'✓ ':''}${esc(n)}</button>`}).join('')}<button class="chip" onclick="draft.lib=!draft.lib;render()">+ Andere</button></div>${draft.lib?libHtml():''}
+<div class="chat">${d.ex.filter(e=>e.sets.length).map(e=>`<div class="bb sys"><b>${esc(e.n)}</b></div>`+e.sets.map((s,i)=>`<div class="bb me">Satz ${i+1}: ${f1(s[0])} kg × ${s[1]}</div>`).join('')).join('')}${d.cur?`<div class="bb sys"><b>${esc(d.cur)}</b><br>${recTxt(d.cur)}</div>`:'<div class="bb sys">Tippe eine Übung an, dann trage Gewicht und Wiederholungen je Satz ein.</div>'}</div>`;
+if(d.cur){const ce=d.ex.find(x=>x.n==d.cur),R=rec(d.cur),n0=ce?ce.sets.length:0,last=n0==0?R.w:n0==1?(R.b||ce.sets[0][0]):ce.sets[n0-1][0],rp=n0==0?R.r:n0==1?R.br:ce.sets[n0-1][1];if(n0==0&&R.w)h+=`<button class="b" onclick="confirmAll()">Vorschlag übernehmen: ${f1(R.w)} kg × ${R.t.split('–').pop()}, danach 2 × ${f1(R.b)} kg × 10</button>`;h+=multiRows(ce,R,n0);if(0)h+=`<div class="inrow"><input id="iw" inputmode="decimal" placeholder="kg" value="${last||''}"><input id="ir" inputmode="numeric" placeholder="${n0==0?'max. 8':'10–12'}" value="${rp||''}" onkeydown="if(event.key=='Enter')addSet()"><button onclick="addSet()">✓</button></div><div class="mu" style="margin-top:4px">Vorschlag aus deinen letzten Quests. Passt er, einfach ✓ tippen, sonst Werte anpassen.</div>${n0==0&&R.w?'<button class="lk" onclick="addPlan()">Alle 3 Sätze wie vorgeschlagen übernehmen</button>':''}`+(ce&&ce.sets.length?`<button class="lk" onclick="undoSet()">Letzten Satz löschen</button>`:'')}
+h+=`<button class="b" onclick="finish()" ${d.ex.some(e=>e.sets.length)?'':'disabled style="opacity:.4"'}>Quest abschließen</button></div>`;
+if(D.S.length){const i=D.S.length-1;h+=`<div class="mu" style="margin:4px 2px">Letzte Quest</div>`+analyse(D.S[i],i)+nextPlan({A:'B',B:'C',C:'A'}[D.S[i].type])}
+h+=volCard()+statsCard()+coachCard();return dayCard()+h}
+function trainOld(){const fl=flash;flash='';const nt=nextType();if(!draft)draft={type:nt,txt:planText(nt)};
+let h=(fl?`<div class="c" style="text-align:center;color:var(--ac);font-weight:700">${fl}</div>`:'')+`<div class="c"><h2>Quest erfassen</h2>
+<div class="r"><div><label>Datum</label><input type="date" id="dt" value="${draft.date||today()}"></div><div><label>Körpergewicht (kg)</label><input id="bw" inputmode="decimal" value="${draft.bw||''}"></div></div>
+<label>Einheit (Vorschlag nach Zyklus: ${nt})</label><select id="ty" onchange="draft={type:this.value,txt:planText(this.value)};render()">${['A','B','C'].map(t=>`<option ${t==draft.type?'selected':''}>${t}</option>`).join('')}</select>
+<label>Sätze: „Übung: Gewicht×Wdh. Gewicht×Wdh.“ (eine Übung pro Zeile). Vorbefüllt mit der Empfehlung, bitte auf die tatsächlichen Werte ändern.</label>
+<textarea id="tx">${esc(draft.txt)}</textarea><button class="b" onclick="addS()">Speichern und analysieren</button></div>`;
+if(D.S.length){const i=D.S.length-1;h+=`<div class="mu" style="margin:4px 2px">Letzte Quest</div>`+analyse(D.S[i],i)+nextPlan({A:'B',B:'C',C:'A'}[D.S[i].type])}
+else h+='<div class="mu">Noch keine Einheiten. Übungen pro Einheit stellst du unter Profil ein.</div>';
+return h}
+function addS(){const ex=parse($('#tx').value);if(!ex.length){alert('Keine Sätze erkannt. Format: Latzug: 50x12 50x10');return}
+D.S.push({date:$('#dt').value||today(),type:$('#ty').value,bw:num($('#bw').value)||null,ex});
+D.S.sort((a,b)=>a.date<b.date?-1:0);const g=100+ex.reduce((a,e)=>a+stats(e.sets).vol,0)/50;flash='[ Quest abgeschlossen ] +'+Math.round(g)+' XP';save();draft=null;render();scrollTo(0,0)}
+function foodOld(){const t=today(),m=D.M.filter(x=>x.d==t),k=m.reduce((a,x)=>a+x.k,0),p=m.reduce((a,x)=>a+x.p,0);
+const pc=(a,b)=>Math.min(100,a/b*100);
+return `<div class="c"><h2>Heute</h2>Kalorien ${Math.round(k)} / ${D.p.kcal}, Rest ${Math.round(D.p.kcal-k)}<div class="bar"><i style="width:${pc(k,D.p.kcal)}%"></i></div>Protein ${Math.round(p)} / ${D.p.prot} g, Rest ${Math.round(D.p.prot-p)} g<div class="bar"><i style="width:${pc(p,D.p.prot)}%"></i></div>
+<table>${m.map((x,i)=>`<tr><td>${esc(x.n)}</td><td>${x.k} kcal</td><td>${x.p} g</td><td><a href="#" onclick="D.M.splice(D.M.indexOf(D.M.filter(y=>y.d=='${t}')[${i}]),1);save();render();return false">✕</a></td></tr>`).join('')}</table></div>
+<div class="c"><h2>Foto-Analyse</h2><input type="file" id="ph" accept="image/*"><button class="b" onclick="photo()">Mahlzeit analysieren</button><div class="mu" id="pr" style="margin-top:6px">Foto der Mahlzeit wählen. Die Schätzung füllt das Formular darunter, du prüfst und speicherst.</div></div>
+<div class="c"><h2>Mahlzeit hinzufügen oder korrigieren</h2><label>Name</label><input id="mn"><div class="r"><div><label>kcal</label><input id="mk" inputmode="numeric"></div><div><label>Protein (g)</label><input id="mp" inputmode="decimal"></div></div><button class="b" onclick="addM()">Hinzufügen</button><div class="mu" style="margin-top:6px">Werte sind Schätzungen, außer du übernimmst sie von der Verpackung.</div></div>`}
+async function photo(){const f=$('#ph').files[0],o=$('#pr');if(!f){o.textContent='Bitte Foto wählen.';return}o.textContent='Analysiere …';try{const dataUrl=await new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(reader.result);reader.onerror=reject;reader.readAsDataURL(f)});if(f.size>5*1024*1024)throw Error('Foto zu groß (maximal 5 MB)');const r=await aiRequest({task:'food',image:dataUrl});$('#mn').value=r.name||'';$('#mk').value=Math.round(r.kcal||0);$('#mp').value=Math.round(r.protein||0);$('#mc').value=Math.round(r.carbs||0);$('#mf').value=Math.round(r.fat||0);pm=r.mikros||null;o.textContent='Geschätzt: '+Math.round(r.kcal||0)+' kcal, '+Math.round(r.protein||0)+' g Protein. '+(r.hinweis||'')+' Bitte Werte prüfen.';}catch(e){o.textContent=e.message+' – Werte alternativ manuell eintragen.'}}
+let pm=null;
+function tgOld(){const p=D.p,w=curW(),kc=p.kcal,pr=p.prot,fat=w?Math.round(w*0.8):Math.round(kc*0.25/9),ch=Math.max(0,Math.round((kc-pr*4-fat*9)/4)),f=p.sex=='weiblich';return{kc,pr,fat,ch,mic:[['fib','Ballaststoffe','g',Math.round(kc/1000*14)],['fe','Eisen','mg',f?15:10],['mg','Magnesium','mg',f?300:350],['ca','Calcium','mg',1000],['zn','Zink','mg',f?8:11],['k','Kalium','mg',4000],['vc','Vitamin C','mg',f?95:110],['vd','Vitamin D','µg',20],['jod','Jod','µg',200],['o3','Omega-3','mg',250]]}}
+function protT(){const w=curW(),p=D.p,a=new Date().getFullYear()-num(p.year);if(!w)return p.prot||150;return Math.round(w*(((p.mode||'cut')=='cut'?2.0:1.8)+(a>=50?0.2:0)))}
+function micRef(){const p=D.p,w=curW(),f=p.sex=='weiblich',a=new Date().getFullYear()-num(p.year)||30,kc=p.kcal;return[['fib','Ballaststoffe','g',Math.round(kc/1000*14)],['h2o','Wasser','L',w?+(w*0.035+0.5).toFixed(1):2.5],['fe','Eisen','mg',f?(a>=51?10:15):10],['mg','Magnesium','mg',f?(a<25?310:300):(a<25?400:350)],['ca','Calcium','mg',a<19?1200:1000],['zn','Zink','mg',f?8:11],['k','Kalium','mg',4000],['vc','Vitamin C','mg',f?95:110],['vd','Vitamin D','µg',20],['jod','Jod','µg',200],['o3','Omega-3 (EPA+DHA)','mg',250]]}
+function tg(){const p=D.p,w=curW(),kc=p.kcal,pr=protT(),fat=w?Math.round(w*0.8):Math.round(kc*0.25/9),ch=Math.max(0,Math.round((kc-pr*4-fat*9)/4));return{kc,pr,fat,ch,mic:micRef().filter(m=>m[0]!='h2o')}}
+function body(){return bodyM()+energy()+adapt()+charts()+uView()}
+function nutChart(){const pk=[],pp=[];for(let i=6;i>=0;i--){const d=new Date(Date.now()-i*864e5).toISOString().slice(0,10),m=D.M.filter(x=>x.d==d);if(m.length){pk.push([d,m.reduce((a,x)=>a+x.k,0)]);pp.push([d,m.reduce((a,x)=>a+x.p,0)])}}return `<div class="c"><h2>7-Tage-Verlauf</h2><b>Kalorien</b>${lc(pk,'kcal')}<br><b>Protein</b>${lc(pp,'g')}</div>`}
+function statsCard(){if(D.S.length<2)return '';const vols=D.S.map(s=>[s.date,s.ex.reduce((a,e)=>a+stats(e.sets).vol,0)]),tot=vols.reduce((a,v)=>a+v[1],0),wks=Math.max(1,(Date.now()-new Date(D.S[0].date))/6048e5),cnt=Array(8).fill(0);D.S.forEach(s=>{const k=Math.floor((Date.now()-new Date(s.date))/6048e5);if(k>=0&&k<8)cnt[7-k]++});const mxc=Math.max(1,...cnt),bars=cnt.map((c,i)=>`<rect x="${10+i*36}" y="${70-c/mxc*60}" width="26" height="${c/mxc*60}" rx="3" fill="var(--ac)"/><text x="${23+i*36}" y="84" font-size="9" text-anchor="middle" fill="var(--mu)">${c}</text>`).join('');
+const nm=[...new Set(D.S.flatMap(s=>s.ex.map(e=>e.n)))],pr=nm.map(n=>{const h=hist(n);if(h.length<2)return null;const a=stats(h[0].sets).best,b=stats(h[h.length-1].sets).best;return[n,a,b,(b/a-1)*100]}).filter(Boolean).sort((x,y)=>y[3]-x[3]).slice(0,10);
+return `<div class="c"><h2>Statistik</h2><table><tr><td>Quests</td><td>${D.S.length}</td></tr><tr><td>Ø Quests/Woche</td><td>${f1(D.S.length/wks)}</td></tr><tr><td>Gesamtvolumen</td><td>${Math.round(tot).toLocaleString('de-DE')} kg</td></tr><tr><td>Ø Volumen/Quest</td><td>${Math.round(tot/D.S.length).toLocaleString('de-DE')} kg</td></tr></table><br><b>Volumen pro Quest</b>${lc(vols,'kg')}<br><b>Quests pro Woche (letzte 8 Wochen)</b><svg viewBox="0 0 300 90" width="100%">${bars}</svg><br><b>Kraftentwicklung (e1RM, erste → letzte)</b><table>${pr.map(r=>`<tr><td>${esc(r[0])}</td><td>${f1(r[1])} → ${f1(r[2])}</td><td class="${r[3]>=0?'ok':'bad'}">${r[3]>=0?'+':''}${r[3].toFixed(1)} %</td></tr>`).join('')}</table></div>`}
+const LIB=[['Brust',['Bankdrücken frei','Schrägbankdrücken Kurzhantel','Brustpresse','Butterfly Maschine','Kabelzug Fly','Dips']],['Rücken/Lat',['Klimmzüge','Latzug eng','Rudern Kabel','Rudern Maschine','T-Bar Rudern','Geradarm Latzug']],['Schultern',['Schulterdrücken Maschine','Seitheben Kurzhantel','Seitheben Kabel','Reverse Butterfly','Face Pulls']],['Bizeps',['Bizeps Curl Kurzhantel','Hammer Curls','Kabel Curl']],['Trizeps',['Trizeps Overhead Kabel','Dips Maschine','Skull Crusher']],['Beine',['Kniebeuge','Beinstrecker','Ausfallschritte','Rumänisches Kreuzheben','Hip Thrust']],['Waden',['Wadenheben stehend','Wadenheben sitzend']],['Bauch',['Crunch Maschine','Hängendes Beinheben','Kabel Crunch']]];
+function libHtml(){return `<div style="margin:10px 0"><div class="mu">Weitere Übungen nach Muskelgruppe. Antippen zum Auswählen.</div>${LIB.map(([g,l],gi)=>`<div class="mu" style="margin-top:8px"><b>${g}</b></div><div class="chips">${l.map((n,i)=>`<button class="chip" onclick="pickLib(${gi},${i})">${esc(n)}</button>`).join('')}</div>`).join('')}<button class="chip" style="margin-top:8px" onclick="draft.lib=false;customEx()">+ Eigene Übung eingeben</button></div>`}
+function pickLib(g,i){const n=LIB[g][1][i];if(!exList().includes(n))draft.ex.push({n,sets:[]});draft.cur=n;draft.lib=false;render()}
+function food(){pm=null;const t=today(),idx=D.M.map((x,i)=>i).filter(i=>D.M[i].d==t),m=idx.map(i=>D.M[i]),sm=k=>m.reduce((a,x)=>a+(x[k]||0),0),T=tg(),bar=(l,a,b,u)=>`${l}: ${Math.round(a)} / ${b} ${u}<div class="bar"><i style="width:${Math.min(100,a/b*100)}%"></i></div>`,mm=m.filter(x=>x.m).length;
+return `<div class="c"><h2>Heute</h2>${bar('Kalorien',sm('k'),T.kc,'kcal')}${bar('Protein',sm('p'),T.pr,'g')}${bar('Kohlenhydrate',sm('c'),T.ch,'g')}${bar('Fett',sm('f'),T.fat,'g')}<div class="mu">Rest: ${Math.round(T.kc-sm('k'))} kcal · ${Math.round(T.pr-sm('p'))} g Protein</div>
+<table style="margin-top:8px"><tr><th>Mahlzeit</th><th>kcal</th><th>P</th><th>KH</th><th>F</th><th></th></tr>${idx.map(i=>{const x=D.M[i];return `<tr><td>${esc(x.n)}</td><td>${Math.round(x.k)}</td><td>${Math.round(x.p)}</td><td>${Math.round(x.c||0)}</td><td>${Math.round(x.f||0)}</td><td><a href="#" onclick="delM(${i});return false">✕</a></td></tr>`}).join('')}</table></div>
+${nutChart()}<div class="c"><h2>Mikronährstoffe heute</h2><table>${T.mic.map(([k,l,u,g])=>{const a=m.reduce((s,x)=>s+((x.m&&x.m[k])||0),0);return `<tr><td>${l}</td><td>${Math.round(a*10)/10} / ${g} ${u}</td><td>${Math.round(a/g*100)} %</td></tr>`}).join('')}</table><div class="mu" style="margin-top:6px">Nur Mahlzeiten mit Foto-Analyse liefern Mikros (${mm} von ${m.length} heute). Alles ist grob geschätzt, die Zielwerte sind Richtwerte.</div></div>
+<div class="c"><h2>Foto-Analyse</h2><input type="file" id="ph" accept="image/*"><button class="b" onclick="photo()">Mahlzeit analysieren</button><div class="mu" id="pr" style="margin-top:6px">Foto der Mahlzeit wählen. Die Schätzung füllt das Formular darunter, du prüfst und speicherst.</div></div>
+<div class="c"><h2>Mahlzeit hinzufügen oder korrigieren</h2><label>Name</label><input id="mn"><div class="r"><div><label>kcal</label><input id="mk" inputmode="numeric"></div><div><label>Protein (g)</label><input id="mp" inputmode="decimal"></div><div><label>Kohlenhydrate (g)</label><input id="mc" inputmode="decimal"></div><div><label>Fett (g)</label><input id="mf" inputmode="decimal"></div></div><button class="b" onclick="addM()">Hinzufügen</button></div>`}
+function addM(){const k=num($('#mk').value);if(isNaN(k))return;D.M.push({d:today(),n:$('#mn').value||'Mahlzeit',k,p:num($('#mp').value)||0,c:num($('#mc').value)||0,f:num($('#mf').value)||0,m:pm});pm=null;save();render()}
+function delM(i){D.M.splice(i,1);save();render()}
+function addMOld(){const k=num($('#mk').value);if(isNaN(k))return;D.M.push({d:today(),n:$('#mn').value||'Mahlzeit',k,p:num($('#mp').value)||0});save();render()}
+const UM=[['neck','Nacken',20,26,34,'Direkt unter dem Kehlkopf, Maßband waagerecht.'],['shoulder','Schultern (Umfang)',26,3,57,'Um die breiteste Stelle von Schultern und Oberarmen, Arme hängen locker.'],['chest','Brust',34,13,47,'Auf Brustwarzenhöhe unter den Achseln, locker, ausgeatmet.'],['waist','Taille',52,15,45,'Auf Höhe des Bauchnabels, entspannt ausgeatmet, nicht einziehen.'],['hip','Hüfte',70,16,44,'Um die breiteste Stelle des Gesäßes.'],['arm','Oberarm',40,47,55,'Mitte zwischen Schulter und Ellbogen, Arm locker (immer gleich).'],['thigh','Oberschenkel',84,32,43,'Mitte zwischen Hüfte und Knie, aufrecht stehend.'],['calf','Wade',104,32,43,'Dickste Stelle der Wade, im Stehen.']];
+let cx='',uo=false;
+function lc(pts,u){if(pts.length<2)return '<div class="mu">Zu wenig Daten (mind. 2 Werte).</div>';const ys=pts.map(p=>p[1]),mn=Math.min(...ys),mx=Math.max(...ys),r=mx-mn||1,W=300,H=90,xy=pts.map((p,i)=>[8+i*(W-16)/(pts.length-1),H-8-(p[1]-mn)/r*(H-16)]);return `<svg viewBox="0 0 ${W} ${H}" width="100%"><polyline fill="none" stroke="var(--ac)" stroke-width="2" points="${xy.map(a=>a.join(',')).join(' ')}"/>${xy.map(a=>`<circle cx="${a[0]}" cy="${a[1]}" r="2.5" fill="var(--ac)"/>`).join('')}</svg><div class="mu">${f1(pts[0][1])} → ${f1(pts[pts.length-1][1])} ${u} (min ${f1(mn)}, max ${f1(mx)})</div>`}
+function charts(){const names=[...new Set([...D.T.A,...D.T.B,...D.T.C,...D.S.flatMap(s=>s.ex.map(e=>e.n))])];if(!cx)cx=names[0]||'';const bw=D.B.map(x=>[x.d,x.bw]),wa=D.B.filter(x=>x.w).map(x=>[x.d,x.w]),vr=(D.U||[]).filter(e=>e.v.shoulder&&e.v.waist).map(e=>[e.d,e.v.shoulder/e.v.waist]),st=cx?hist(cx).map(h=>[h.d,stats(h.sets).best]):[];return `<div class="c"><h2>Verlauf</h2><b>Körpergewicht</b>${lc(bw,'kg')}<br><b>Taille</b>${lc(wa,'cm')}<br><b>Schulter/Taille</b>${lc(vr,'')}<br><b>Kraft (e1RM)</b><select onchange="cx=this.value;render()">${names.map(n=>`<option ${n==cx?'selected':''}>${esc(n)}</option>`).join('')}</select>${lc(st,'kg')}</div>`}
+function adapt(){const c=new Date(Date.now()-27*864e5).toISOString().slice(0,10),l=D.B.filter(x=>x.d>=c),box=t=>`<div class="c"><h2>Kalorienziel prüfen</h2>${t}</div>`;
+if(l.length<3||(new Date(l[l.length-1].d)-new Date(l[0].d))<10*864e5)return box('<div class="mu">Zu wenig Daten: mindestens 3 Gewichte über mindestens 10 Tage in den letzten 4 Wochen.</div>');
+const xs=l.map(x=>(new Date(x.d)-new Date(l[0].d))/864e5),ys=l.map(x=>x.bw),mx=xs.reduce((a,b)=>a+b)/xs.length,my=ys.reduce((a,b)=>a+b)/ys.length,sl=xs.reduce((a,x,i)=>a+(x-mx)*(ys[i]-my),0)/xs.reduce((a,x)=>a+(x-mx)**2,0),pct=sl*7/my*100,mode=D.p.mode||'cut',[lo,hi]={cut:[-0.75,-0.15],hold:[-0.25,0.25],bulk:[0.1,0.35]}[mode];
+let adj=0,why='Trend passt zum Ziel.';if(pct>hi){adj=-150;why='Der Gewichtstrend liegt über dem Zielbereich.'}else if(pct<lo){adj=150;why='Der Gewichtstrend liegt unter dem Zielbereich (zu schnell, Kraft und Muskulatur schützen).'}
+return box(`Trend: ${f1(sl*7)} kg/Woche (${pct.toFixed(2)} %/Woche), Zielbereich ${lo} bis ${hi} %/Woche.<br>${why}`+(adj?`<br><b>Vorschlag: ${D.p.kcal+adj} kcal</b> (${adj>0?'+':''}${adj}) <button class="chip" onclick="D.p.kcal=${D.p.kcal+adj};save();render()">Übernehmen</button>`:'')+'<div class="mu">Nur anpassen, wenn die Wiegebedingungen konstant waren. Trend über mehrere Wochen zählt, nicht einzelne Tage.</div>')}
+function fig(m){return `<svg viewBox="0 0 60 120" width="44" height="88" aria-hidden="true"><g fill="var(--bd)" stroke="var(--mu)" stroke-width=".8"><circle cx="30" cy="10" r="8"/><rect x="27" y="17" width="6" height="6"/><path d="M14 24h32l-2 42H16z"/><rect x="5" y="24" width="8" height="42" rx="3"/><rect x="47" y="24" width="8" height="42" rx="3"/><rect x="17" y="66" width="11" height="50" rx="3"/><rect x="32" y="66" width="11" height="50" rx="3"/></g><rect x="${m[3]}" y="${m[2]-2}" width="${m[4]-m[3]}" height="4" rx="2" fill="var(--ac)"/></svg>`}
+function uLast(k){const a=(D.U||[]).filter(e=>e.v[k]!=null);return[a[a.length-1],a[a.length-2]]}
+function uView(){const rows=UM.map(m=>{const[l,p]=uLast(m[0]),v=l&&l.v[m[0]],pv=p&&p.v[m[0]];return `<div style="display:grid;grid-template-columns:48px 1fr 84px;gap:8px;align-items:center;margin:8px 0">${fig(m)}<div><b>${m[1]}</b><div class="mu">${m[5]}</div><div class="mu">${v?'Zuletzt '+f1(v)+' cm'+(pv?' ('+(v-pv>0?'+':'')+f1(v-pv)+')':''):''}</div></div><input id="u_${m[0]}" inputmode="decimal" placeholder="cm"></div>`}).join('');const s=uLast('shoulder')[0],w=uLast('waist')[0],ra=s&&w?`<div class="mu">Schulter/Taille: ${(s.v.shoulder/w.v.waist).toFixed(2)}. Höher bedeutet mehr V-Form, entscheidend ist der Verlauf.</div>`:'';return `<details class="c" ${uo?'open':''} ontoggle="uo=this.open"><summary style="cursor:pointer;list-style:none"><h2 style="display:inline">Ganzkörpermessung</h2> <span class="mu">(aufklappen)</span></summary><div class="mu">Maßband waagerecht, nicht einschneiden, entspannt, am besten morgens und immer gleich. Der helle Balken zeigt die Messstelle.</div>${rows}<button class="b" onclick="addU()">Maße speichern</button>${ra}</details>`}
+function addU(){const v={};UM.forEach(m=>{const x=num($('#u_'+m[0]).value);if(!isNaN(x))v[m[0]]=x});if(!Object.keys(v).length)return;D.U=D.U||[];D.U.push({d:today(),v});save();render()}
+function bodyM(){const b=D.B.filter(x=>Number.isFinite(x.bw)).slice().sort((a,b)=>a.d.localeCompare(b.d)),h=num(D.p.h);let tr='';if(b.length>=3){const a=b.slice(-3).reduce((s,x)=>s+x.bw,0)/3,o=b.slice(-6,-3).length?b.slice(-6,-3).reduce((s,x)=>s+x.bw,0)/b.slice(-6,-3).length:null;tr=o?`Trend (Ø 3 Messungen): ${f1(a-o)} kg ggü. davor. Einzelne Schwankungen nicht überbewerten.`:''}
+return `<div class="c"><h2>Messung</h2><div class="r"><div><label>Gewicht (kg)</label><input id="bb" inputmode="decimal"></div><div><label>Taille (cm)</label><input id="bt" inputmode="decimal"></div></div><label>Schritte heute (optional)</label><input id="bs" inputmode="numeric"><button class="b" onclick="addB()">Speichern</button></div>
+<div class="c"><h2>Verlauf</h2><div class="mu">${tr}</div><table><tr><th>Datum</th><th>kg</th><th>Taille</th><th>Taille/Größe</th><th>Schritte</th></tr>${b.slice().reverse().slice(0,15).map(x=>`<tr><td>${x.d}</td><td>${f1(x.bw)}</td><td>${x.w?f1(x.w):'–'}</td><td>${x.w&&h?(x.w/h).toFixed(2):'–'}</td><td>${x.st||'–'}</td></tr>`).join('')}</table><div class="mu" style="margin-top:6px">Taille/Größe unter 0,5 gilt als Richtwert. BIA und BMI sind nur grobe Referenzen.</div></div>`}
+function addB(){const bw=num($('#bb').value);if(!Number.isFinite(bw)||bw<=0)return;const d=today(),old=D.B.find(x=>x.d===d);const w=num($('#bt').value),st=parseInt($('#bs').value);if(old){old.bw=bw;if(Number.isFinite(w)&&w>0)old.w=w;if(Number.isFinite(st)&&st>=0)old.st=st}else D.B.push({d,bw,w:Number.isFinite(w)&&w>0?w:null,st:Number.isFinite(st)&&st>=0?st:null});D.B.sort((a,b)=>a.d.localeCompare(b.d));save();render()}
+function sett(){const p=D.p;const i=(k,l,t='text')=>`<div><label>${l}</label><input id="p_${k}" type="${t}" value="${esc(p[k])}"></div>`;
+return `<div class="c"><h2>Profil</h2><div class="r">${i('name','Name')}${i('year','Geburtsjahr')}${i('h','Größe (cm)')}<div><label>Geschlecht</label><select id="p_sex">${['','männlich','weiblich','divers'].map(x=>`<option ${x==p.sex?'selected':''}>${x}</option>`).join('')}</select></div>${i('kcal','Kalorienziel')}<div><label>Proteinziel (g), automatisch</label><input value="${protT()}" disabled></div>${i('min','Wdh. min')}${i('max','Wdh. max')}${i('steps','Ø Schritte/Tag (ohne Log)')}<div><label>Ziel</label><select id="p_mode">${[['cut','Fettabbau moderat'],['hold','Gewicht halten'],['bulk','Aufbau']].map(([k,l])=>`<option value="${k}" ${(p.mode||'cut')==k?'selected':''}>${l}</option>`).join('')}</select></div></div>
+<label>Trainingstage</label><input id="p_days" value="${esc(p.days)}"><label>Körperliche Ziele in Prioritätsreihenfolge</label><textarea id="p_goal" style="min-height:70px;font-family:inherit">${esc(p.goal)}</textarea></div>
+<div class="c"><h2>Übungen pro Einheit</h2><div class="mu">Eine Übung pro Zeile. Reihenfolge konstant halten, damit Werte vergleichbar bleiben.</div>${['A','B','C'].map(t=>`<label>Einheit ${t}</label><textarea id="t_${t}" style="min-height:90px;font-family:inherit">${esc(D.T[t].join('\n'))}</textarea>`).join('')}<button class="b" onclick="saveP()">Speichern</button></div>
+<div class="c"><h2>Startdaten</h2><div class="mu">Lädt 22 Quests (01.09.–20.10.2026), Gewichte und deine Profilwerte aus dem Prompt. Vorhandene Daten bleiben, doppelte Tage werden übersprungen.</div><button class="b" onclick="seed()">Meine Startdaten laden</button></div>
+<div class="c"><h2>Backup</h2><div class="mu">Die Daten liegen nur in diesem Browser. Exportiere sie regelmäßig.</div><button class="b" onclick="exp()">Backup exportieren</button><label>Backup wiederherstellen (Datei)</label><input type="file" accept=".json,application/json" onchange="rest(this.files[0])"></div>
+<div class="c"><h2>Frühere Quests importieren</h2><div class="mu">Pro Quest ein Block, Blöcke durch eine Leerzeile trennen. Erste Zeile: Datum Typ Gewicht (optional), danach pro Übung eine Zeile.</div><textarea id="imp" placeholder="2026-10-04 A 77,5&#10;Latzug: 50x8 42,5x10 42,5x10"></textarea><button class="b" onclick="imp()">Importieren</button></div>
+<div class="c"><h2>Daten</h2><button class="b" style="background:var(--bad)" onclick="if(confirm('Alle Daten löschen?')){D=JSON.parse(JSON.stringify(DEF));save();render()}">Alles zurücksetzen</button></div>`}
+function imp(){const bl=$('#imp').value.split(/\n\s*\n/);let n=0;bl.forEach(b=>{const ls=b.trim().split('\n');const m=ls[0].match(/(\d{4}-\d{2}-\d{2})\s+([ABC])\s*([\d.,]+)?/i);if(!m)return;const ex=parse(ls.slice(1).join('\n'));if(!ex.length)return;if(D.S.some(q=>q.date===m[1]&&q.type===m[2].toUpperCase()))return;D.S.push({date:m[1],type:m[2].toUpperCase(),bw:m[3]?num(m[3]):null,ex});n++});D.S.sort((a,b)=>a.date<b.date?-1:a.date>b.date?1:0);save();alert(n+' Quest(s) importiert');render()}
+function exp(){const blob=new Blob([JSON.stringify(D,null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='fit-coach-backup-'+today()+'.json';document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),3000)}
+function rest(f){if(!f)return;const r=new FileReader();r.onload=()=>{try{const x=JSON.parse(r.result);if(!x||!x.S||!x.p)throw 0;if(!confirm('Aktuelle Daten durch das Backup ersetzen?'))return;D=Object.assign(JSON.parse(JSON.stringify(DEF)),x);save();render()}catch(e){alert('Ungültige Backup-Datei')}};r.readAsText(f)}
+function saveP(){['name','year','h','sex','days','goal','mode'].forEach(k=>D.p[k]=$('#p_'+k).value);['kcal','min','max','steps'].forEach(k=>D.p[k]=num($('#p_'+k).value)||DEF.p[k]);['A','B','C'].forEach(t=>D.T[t]=$('#t_'+t).value.split('\n').map(s=>s.trim()).filter(Boolean));save();alert('Gespeichert');render()}
+function render(){nav();$('#v').innerHTML=hud()+{train,food,body,set:sett}[tab]();showT()}
+render();
+</script></body></html>
